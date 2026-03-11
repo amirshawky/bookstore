@@ -1,16 +1,16 @@
-
-// api/square-proxy.js
-// Vercel Serverless Function to proxy Square API requests
+// Vercel Serverless Function: /api/square-proxy.js
 
 export default async function handler(req, res) {
   // Enable CORS
+  res.setHeader('Access-Control-Allow-Credentials', true);
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
   // Handle preflight
   if (req.method === 'OPTIONS') {
-    return res.status(200).end();
+    res.status(200).end();
+    return;
   }
 
   // Only allow POST
@@ -25,9 +25,16 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    const body = { enabled_location_ids: [locationId] };
-    if (cursor) body.cursor = cursor;
+    // Prepare request to Square API
+    const body = {
+      enabled_location_ids: [locationId]
+    };
 
+    if (cursor) {
+      body.cursor = cursor;
+    }
+
+    // Call Square API from server-side
     const response = await fetch('https://connect.squareup.com/v2/catalog/search-catalog-items', {
       method: 'POST',
       headers: {
@@ -45,9 +52,9 @@ export default async function handler(req, res) {
     }
 
     return res.status(200).json(data);
+
   } catch (error) {
-    console.error('Proxy error:', error);
-    return res.status(500).json({ error: 'Internal server error' });
+    console.error('Square API Error:', error);
+    return res.status(500).json({ error: 'Internal server error', message: error.message });
   }
 }
-
