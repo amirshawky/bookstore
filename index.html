@@ -15,21 +15,20 @@
     <script type="text/babel">
         const { useState, useEffect } = React;
 
-        // Configuration
+        // CONFIGURATION
         const SQUARE_CONFIG = {
             accessToken: 'EAAAl12N5ApoxZoy_ILv_aRqzNbJCpTuZF2CMkXIjIpiUFACtuS_mxMLPg4BqOvM',
             locationId: 'LYE44QAJ31T28',
-            // IMPORTANT: This uses the Vercel proxy endpoint
-            proxyUrl: '/api/square-proxy'
+            proxyUrl: '/api/square-proxy'  // Vercel serverless function
         };
         
         function validateConfig() {
             const errors = [];
             if (!SQUARE_CONFIG.accessToken || SQUARE_CONFIG.accessToken === 'YOUR_SQUARE_ACCESS_TOKEN') {
-                errors.push('Square Access Token not configured');
+                errors.push('Square Access Token not set');
             }
             if (!SQUARE_CONFIG.locationId || SQUARE_CONFIG.locationId === 'YOUR_LOCATION_ID') {
-                errors.push('Square Location ID not configured');
+                errors.push('Square Location ID not set');
             }
             return errors;
         }
@@ -40,19 +39,27 @@
                 try {
                     const data = localStorage.getItem('bookstore_' + key);
                     return data ? JSON.parse(data) : null;
-                } catch (e) { return null; }
+                } catch (e) {
+                    console.error('Storage error:', e);
+                    return null;
+                }
             },
             set(key, value) {
                 try {
                     localStorage.setItem('bookstore_' + key, JSON.stringify(value));
                     return true;
-                } catch (e) { return false; }
+                } catch (e) {
+                    console.error('Storage error:', e);
+                    return false;
+                }
             },
             delete(key) {
                 try {
                     localStorage.removeItem('bookstore_' + key);
                     return true;
-                } catch (e) { return false; }
+                } catch (e) {
+                    return false;
+                }
             }
         };
 
@@ -64,44 +71,71 @@
         }
 
         const AuthManager = {
-            getUsers() { return storage.get('users') || {}; },
-            saveUsers(users) { storage.set('users', users); },
+            getUsers() {
+                return storage.get('users') || {};
+            },
+            
+            saveUsers(users) {
+                storage.set('users', users);
+            },
             
             async register(username, password, email, fullName) {
                 const users = this.getUsers();
                 const key = username.toLowerCase();
-                if (users[key]) return { success: false, error: 'Username exists' };
+                
+                if (users[key]) {
+                    return { success: false, error: 'Username already exists' };
+                }
+                
+                const hashedPassword = await hashPassword(password);
+                const isFirstUser = Object.keys(users).length === 0;
                 
                 users[key] = {
                     username: key,
-                    password: await hashPassword(password),
-                    email, fullName,
-                    role: Object.keys(users).length === 0 ? 'admin' : 'pending',
+                    password: hashedPassword,
+                    email,
+                    fullName,
+                    role: isFirstUser ? 'admin' : 'pending',
                     createdAt: new Date().toISOString()
                 };
+                
                 this.saveUsers(users);
                 return { success: true, role: users[key].role };
             },
             
             async login(username, password) {
                 const users = this.getUsers();
-                const user = users[username.toLowerCase()];
-                if (!user) return { success: false, error: 'Invalid credentials' };
+                const key = username.toLowerCase();
+                const user = users[key];
+                
+                if (!user) {
+                    return { success: false, error: 'Invalid username or password' };
+                }
                 
                 const hashedPassword = await hashPassword(password);
-                if (user.password !== hashedPassword) return { success: false, error: 'Invalid credentials' };
-                if (user.role === 'pending') return { success: false, error: 'Pending approval' };
+                if (user.password !== hashedPassword) {
+                    return { success: false, error: 'Invalid username or password' };
+                }
+                
+                if (user.role === 'pending') {
+                    return { success: false, error: 'Account pending admin approval' };
+                }
                 
                 return {
                     success: true,
-                    user: { username: user.username, email: user.email, fullName: user.fullName, role: user.role }
+                    user: {
+                        username: user.username,
+                        email: user.email,
+                        fullName: user.fullName,
+                        role: user.role
+                    }
                 };
             },
             
             updateUserRole(username, role) {
                 const users = this.getUsers();
-                if (users[username.toLowerCase()]) {
-                    users[username.toLowerCase()].role = role;
+                if (users[username]) {
+                    users[username].role = role;
                     this.saveUsers(users);
                     return true;
                 }
@@ -110,25 +144,30 @@
             
             deleteUser(username) {
                 const users = this.getUsers();
-                delete users[username.toLowerCase()];
+                delete users[username];
                 this.saveUsers(users);
             },
             
-            getAllUsers() { return Object.values(this.getUsers()); },
-            getPendingUsers() { return this.getAllUsers().filter(u => u.role === 'pending'); }
+            getAllUsers() {
+                return Object.values(this.getUsers());
+            },
+            
+            getPendingUsers() {
+                return this.getAllUsers().filter(u => u.role === 'pending');
+            }
         };
 
         const SquareAPI = {
             async searchInventory(searchTerm) {
                 const items = await this.getAllItems();
-                const search = searchTerm.toLowerCase();
-                return items.filter(item =>
-                    (item.name?.toLowerCase() || '').includes(search) ||
-                    (item.description?.toLowerCase() || '').includes(search) ||
-                    (item.sku?.toLowerCase() || '').includes(search) ||
-                    (item.author?.toLowerCase() || '').includes(search) ||
-                    (item.publisher?.toLowerCase() || '').includes(search)
-                );
+                return items.filter(item => {
+                    const search = searchTerm.toLowerCase();
+                    return (item.name?.toLowerCase() || '').includes(search) ||
+                           (item.description?.toLowerCase() || '').includes(search) ||
+                           (item.sku?.toLowerCase() || '').includes(search) ||
+                           (item.author?.toLowerCase() || '').includes(search) ||
+                           (item.publisher?.toLowerCase() || '').includes(search);
+                });
             },
             
             async getAllItems() {
@@ -136,18 +175,22 @@
                 let cursor = null;
                 
                 do {
-                    // Call our Vercel proxy instead of Square API directly
+                    // Call our Vercel serverless function instead of Square directly
                     const response = await fetch(SQUARE_CONFIG.proxyUrl, {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
                         body: JSON.stringify({
                             accessToken: SQUARE_CONFIG.accessToken,
                             locationId: SQUARE_CONFIG.locationId,
-                            cursor
+                            cursor: cursor
                         })
                     });
                     
-                    if (!response.ok) throw new Error('API error: ' + response.status);
+                    if (!response.ok) {
+                        throw new Error('Proxy error: ' + response.status);
+                    }
                     
                     const data = await response.json();
                     allItems = allItems.concat(data.items || []);
@@ -176,6 +219,7 @@
             }
         };
 
+        // Components
         function App() {
             const [currentUser, setCurrentUser] = useState(null);
             const [loading, setLoading] = useState(true);
@@ -183,41 +227,59 @@
             const [configError, setConfigError] = useState(null);
 
             useEffect(() => {
-                const errors = validateConfig();
-                if (errors.length > 0) {
-                    setConfigError(errors);
+                const configErrors = validateConfig();
+                if (configErrors.length > 0) {
+                    setConfigError(configErrors);
                     setLoading(false);
                     return;
                 }
                 
-                const session = storage.get('session');
-                if (session) setCurrentUser(session);
+                const sessionUser = storage.get('session');
+                if (sessionUser) {
+                    setCurrentUser(sessionUser);
+                }
                 setLoading(false);
             }, []);
 
-            if (loading) return <div className="min-h-screen flex items-center justify-center"><div className="text-xl">Loading...</div></div>;
+            const handleLogin = (user) => {
+                setCurrentUser(user);
+                storage.set('session', user);
+            };
+
+            const handleLogout = () => {
+                setCurrentUser(null);
+                storage.delete('session');
+                setView('search');
+            };
+
+            if (loading) {
+                return <div className="min-h-screen flex items-center justify-center"><div className="text-xl">Loading...</div></div>;
+            }
 
             if (configError) {
                 return (
                     <div className="min-h-screen flex items-center justify-center p-4">
                         <div className="bg-red-50 border-2 border-red-300 rounded-xl p-8 max-w-2xl">
                             <h2 className="text-2xl font-bold text-red-800 mb-4">⚠️ Configuration Required</h2>
-                            <div className="bg-white rounded-lg p-4">
+                            <div className="bg-white rounded-lg p-4 mb-4">
+                                <p className="font-bold text-red-700 mb-2">Missing:</p>
                                 <ul className="list-disc ml-6 text-red-600">
                                     {configError.map((e, i) => <li key={i}>{e}</li>)}
                                 </ul>
                             </div>
-                            <p className="text-sm mt-4">Edit index.html and update SQUARE_CONFIG</p>
+                            <p className="text-sm">Edit index.html on Vercel and update SQUARE_CONFIG</p>
                         </div>
                     </div>
                 );
             }
 
-            if (!currentUser) return <AuthScreen onLogin={(user) => { setCurrentUser(user); storage.set('session', user); }} />;
+            if (!currentUser) {
+                return <AuthScreen onLogin={handleLogin} />;
+            }
 
             return (
                 <div className="min-h-screen">
-                    <Header user={currentUser} onLogout={() => { setCurrentUser(null); storage.delete('session'); setView('search'); }} view={view} setView={setView} />
+                    <Header user={currentUser} onLogout={handleLogout} view={view} setView={setView} />
                     {view === 'search' && <SearchView />}
                     {view === 'admin' && currentUser.role === 'admin' && <AdminView />}
                 </div>
@@ -237,10 +299,11 @@
 
             const handleSubmit = async (e) => {
                 e.preventDefault();
-                setError(''); setMessage('');
+                setError('');
+                setMessage('');
 
                 if (!formData.username || !formData.password) {
-                    setError('Enter username and password');
+                    setError('Please enter username and password');
                     return;
                 }
 
@@ -252,18 +315,30 @@
                         setError(result.error);
                     }
                 } else {
-                    if (!formData.email || !formData.fullName) { setError('Fill all fields'); return; }
-                    if (formData.password.length < 6) { setError('Password must be 6+ chars'); return; }
-                    if (formData.password !== formData.confirmPassword) { setError('Passwords do not match'); return; }
+                    if (!formData.email || !formData.fullName) {
+                        setError('Please fill all fields');
+                        return;
+                    }
+                    if (formData.password.length < 6) {
+                        setError('Password must be 6+ characters');
+                        return;
+                    }
+                    if (formData.password !== formData.confirmPassword) {
+                        setError('Passwords do not match');
+                        return;
+                    }
 
                     const result = await AuthManager.register(formData.username, formData.password, formData.email, formData.fullName);
                     if (result.success) {
                         if (result.role === 'admin') {
-                            setMessage('First user - admin! Logging in...');
-                            setTimeout(() => handleSubmit(e), 1500);
+                            setMessage('First user - you are admin! Logging in...');
+                            setTimeout(() => onLogin({ username: formData.username, email: formData.email, fullName: formData.fullName, role: 'admin' }), 1500);
                         } else {
-                            setMessage('Registered! Pending approval.');
-                            setTimeout(() => { setIsLogin(true); setFormData({ ...formData, password: '', confirmPassword: '' }); }, 2500);
+                            setMessage('Registered! Pending admin approval.');
+                            setTimeout(() => {
+                                setIsLogin(true);
+                                setFormData({ ...formData, password: '', confirmPassword: '' });
+                            }, 2500);
                         }
                     } else {
                         setError(result.error);
@@ -277,6 +352,7 @@
                         <div className="text-center mb-6">
                             <div className="text-5xl mb-4">📚</div>
                             <h1 className="text-3xl font-bold text-gray-800 mb-2">Bookstore Inventory</h1>
+                            <p className="text-gray-600">{isLogin ? 'Sign in' : 'Create account'}</p>
                         </div>
 
                         {error && <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">{error}</div>}
@@ -285,15 +361,36 @@
                         <form onSubmit={handleSubmit} className="space-y-4">
                             {!isLogin && (
                                 <>
-                                    <input type="text" name="fullName" value={formData.fullName} onChange={handleChange} placeholder="Full Name" className="w-full px-4 py-2 border rounded-lg" />
-                                    <input type="email" name="email" value={formData.email} onChange={handleChange} placeholder="Email" className="w-full px-4 py-2 border rounded-lg" />
+                                    <div>
+                                        <label className="block text-sm font-medium mb-1">Full Name</label>
+                                        <input type="text" name="fullName" value={formData.fullName} onChange={handleChange} className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium mb-1">Email</label>
+                                        <input type="email" name="email" value={formData.email} onChange={handleChange} className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" />
+                                    </div>
                                 </>
                             )}
-                            <input type="text" name="username" value={formData.username} onChange={handleChange} placeholder="Username" className="w-full px-4 py-2 border rounded-lg" />
-                            <input type="password" name="password" value={formData.password} onChange={handleChange} placeholder="Password" className="w-full px-4 py-2 border rounded-lg" />
-                            {!isLogin && <input type="password" name="confirmPassword" value={formData.confirmPassword} onChange={handleChange} placeholder="Confirm Password" className="w-full px-4 py-2 border rounded-lg" />}
-                            <button type="submit" className="w-full bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600">{isLogin ? 'Sign In' : 'Register'}</button>
-                            <button type="button" onClick={() => setIsLogin(!isLogin)} className="w-full text-sm text-blue-500 hover:underline">{isLogin ? 'Create account' : 'Back to login'}</button>
+                            <div>
+                                <label className="block text-sm font-medium mb-1">Username</label>
+                                <input type="text" name="username" value={formData.username} onChange={handleChange} className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-500" />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium mb-1">Password</label>
+                                <input type="password" name="password" value={formData.password} onChange={handleChange} className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" />
+                            </div>
+                            {!isLogin && (
+                                <div>
+                                    <label className="block text-sm font-medium mb-1">Confirm Password</label>
+                                    <input type="password" name="confirmPassword" value={formData.confirmPassword} onChange={handleChange} className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" />
+                                </div>
+                            )}
+                            <button type="submit" className="w-full bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600 font-medium">
+                                {isLogin ? 'Sign In' : 'Create Account'}
+                            </button>
+                            <button type="button" onClick={() => setIsLogin(!isLogin)} className="w-full text-sm text-blue-500 hover:underline">
+                                {isLogin ? 'Need account? Register' : 'Have account? Sign in'}
+                            </button>
                         </form>
                     </div>
                 </div>
@@ -303,17 +400,22 @@
         function Header({ user, onLogout, view, setView }) {
             return (
                 <header className="bg-white shadow-sm border-b">
-                    <div className="max-w-7xl mx-auto px-4 h-14 flex justify-between items-center">
-                        <div className="flex items-center space-x-4">
-                            <h1 className="text-xl font-bold">📚 Inventory</h1>
-                            <nav className="flex space-x-1">
-                                <button onClick={() => setView('search')} className={`px-4 py-1.5 text-sm rounded-lg ${view === 'search' ? 'bg-blue-500 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>Search</button>
-                                {user.role === 'admin' && <button onClick={() => setView('admin')} className={`px-4 py-1.5 text-sm rounded-lg ${view === 'admin' ? 'bg-blue-500 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>Admin</button>}
-                            </nav>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                            <div className="text-sm"><div className="font-medium">{user.fullName}</div><div className="text-xs text-gray-500">{user.role}</div></div>
-                            <button onClick={onLogout} className="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Logout</button>
+                    <div className="max-w-7xl mx-auto px-4">
+                        <div className="flex justify-between items-center h-14">
+                            <div className="flex items-center space-x-4">
+                                <h1 className="text-xl font-bold">📚 Inventory</h1>
+                                <nav className="flex space-x-1">
+                                    <button onClick={() => setView('search')} className={`px-4 py-1.5 text-sm rounded-lg ${view === 'search' ? 'bg-blue-500 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>Search</button>
+                                    {user.role === 'admin' && <button onClick={() => setView('admin')} className={`px-4 py-1.5 text-sm rounded-lg ${view === 'admin' ? 'bg-blue-500 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>Admin</button>}
+                                </nav>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                                <div className="text-sm">
+                                    <div className="font-medium">{user.fullName}</div>
+                                    <div className="text-xs text-gray-500">{user.role}</div>
+                                </div>
+                                <button onClick={onLogout} className="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Logout</button>
+                            </div>
                         </div>
                     </div>
                 </header>
@@ -329,11 +431,13 @@
             const handleSearch = async (e) => {
                 e.preventDefault();
                 if (!searchTerm.trim()) return;
-                setLoading(true); setSearched(true);
+                setLoading(true);
+                setSearched(true);
                 try {
                     const items = await SquareAPI.searchInventory(searchTerm);
                     setResults(items);
                 } catch (error) {
+                    console.error(error);
                     alert('Search failed: ' + error.message);
                 } finally {
                     setLoading(false);
@@ -343,31 +447,39 @@
             return (
                 <div className="max-w-7xl mx-auto px-4 py-6">
                     <form onSubmit={handleSearch} className="flex gap-2 mb-6">
-                        <input type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Search..." className="flex-1 px-4 py-3 border rounded-lg" />
+                        <input type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Search by name, author, publisher, SKU..." className="flex-1 px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500" />
                         <button type="submit" disabled={loading} className="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50">{loading ? '...' : 'Search'}</button>
                     </form>
                     {loading && <div className="text-center py-12"><div className="text-xl">Searching...</div></div>}
                     {!loading && searched && results.length === 0 && <div className="text-center py-12"><div className="text-xl">No results</div></div>}
                     {!loading && results.length > 0 && (
                         <div>
-                            <div className="mb-3 text-sm">Found {results.length} items</div>
+                            <div className="mb-3 text-sm">Found {results.length} item{results.length !== 1 ? 's' : ''}</div>
                             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                                {results.map(item => (
-                                    <div key={item.id} className="bg-white rounded-lg shadow-md p-4">
-                                        <h3 className="font-bold mb-2">{item.name}</h3>
-                                        {item.description && <p className="text-sm text-gray-600 mb-2">{item.description.slice(0, 100)}...</p>}
-                                        <div className="text-sm space-y-1">
-                                            {item.sku && <div className="flex"><span className="text-gray-500 w-16">SKU:</span><span className="font-medium">{item.sku}</span></div>}
-                                            {item.price > 0 && <div className="flex"><span className="text-gray-500 w-16">Price:</span><span className="font-medium">${item.price.toFixed(2)}</span></div>}
-                                            {item.author && <div className="flex"><span className="text-gray-500 w-16">Author:</span><span>{item.author}</span></div>}
-                                            {item.publisher && <div className="flex"><span className="text-gray-500 w-16">Publisher:</span><span className="text-xs">{item.publisher}</span></div>}
-                                            {item.shelfNumber && <div className="flex"><span className="text-gray-500 w-16">Shelf:</span><span>{item.shelfNumber}</span></div>}
-                                        </div>
-                                    </div>
-                                ))}
+                                {results.map(item => <ItemCard key={item.id} item={item} />)}
                             </div>
                         </div>
                     )}
+                </div>
+            );
+        }
+
+        function ItemCard({ item }) {
+            const [expanded, setExpanded] = useState(false);
+            const cleanDesc = item.description.split('\n').filter(l => !l.startsWith('Author:') && !l.startsWith('Publisher:') && !l.startsWith('Shelf No:')).join('\n');
+
+            return (
+                <div className="bg-white rounded-lg shadow-md p-4 hover:shadow-lg">
+                    <h3 className="text-lg font-bold mb-2">{item.name}</h3>
+                    {cleanDesc && <p className="text-sm mb-2">{expanded ? cleanDesc : cleanDesc.slice(0, 80) + (cleanDesc.length > 80 ? '...' : '')}</p>}
+                    {cleanDesc.length > 80 && <button onClick={() => setExpanded(!expanded)} className="text-blue-500 text-xs mb-2 hover:underline">{expanded ? 'Less' : 'More'}</button>}
+                    <div className="space-y-1 text-sm">
+                        {item.sku && <div className="flex"><span className="text-gray-500 w-20">SKU:</span><span className="font-medium">{item.sku}</span></div>}
+                        {item.price > 0 && <div className="flex"><span className="text-gray-500 w-20">Price:</span><span className="font-medium">${item.price.toFixed(2)}</span></div>}
+                        {item.author && <div className="flex"><span className="text-gray-500 w-20">Author:</span><span>{item.author}</span></div>}
+                        {item.publisher && <div className="flex"><span className="text-gray-500 w-20">Publisher:</span><span className="text-xs">{item.publisher}</span></div>}
+                        {item.shelfNumber && <div className="flex"><span className="text-gray-500 w-20">Shelf:</span><span>{item.shelfNumber}</span></div>}
+                    </div>
                 </div>
             );
         }
@@ -383,6 +495,11 @@
                 setAllUsers(AuthManager.getAllUsers());
             };
 
+            const handleApprove = (username) => { AuthManager.updateUserRole(username, 'user'); loadUsers(); };
+            const handleReject = (username) => { if (confirm(`Delete ${username}?`)) { AuthManager.deleteUser(username); loadUsers(); } };
+            const handleMakeAdmin = (username) => { if (confirm(`Make ${username} admin?`)) { AuthManager.updateUserRole(username, 'admin'); loadUsers(); } };
+            const handleRevokeAdmin = (username) => { if (confirm(`Revoke admin from ${username}?`)) { AuthManager.updateUserRole(username, 'user'); loadUsers(); } };
+
             return (
                 <div className="max-w-7xl mx-auto px-4 py-6">
                     <h2 className="text-2xl font-bold mb-6">User Management</h2>
@@ -397,8 +514,8 @@
                                             <div className="text-sm text-gray-500">@{user.username} • {user.email}</div>
                                         </div>
                                         <div className="space-x-2">
-                                            <button onClick={() => { AuthManager.updateUserRole(user.username, 'user'); loadUsers(); }} className="px-4 py-2 text-sm bg-green-500 text-white rounded-lg">Approve</button>
-                                            <button onClick={() => { if (confirm('Delete?')) { AuthManager.deleteUser(user.username); loadUsers(); } }} className="px-4 py-2 text-sm bg-red-500 text-white rounded-lg">Reject</button>
+                                            <button onClick={() => handleApprove(user.username)} className="px-4 py-2 text-sm bg-green-500 text-white rounded-lg hover:bg-green-600">Approve</button>
+                                            <button onClick={() => handleReject(user.username)} className="px-4 py-2 text-sm bg-red-500 text-white rounded-lg hover:bg-red-600">Reject</button>
                                         </div>
                                     </div>
                                 ))}
@@ -417,8 +534,8 @@
                                     </div>
                                     {user.role !== 'pending' && (
                                         <div>
-                                            {user.role === 'user' && <button onClick={() => { if (confirm('Make admin?')) { AuthManager.updateUserRole(user.username, 'admin'); loadUsers(); } }} className="px-4 py-1.5 text-sm bg-purple-500 text-white rounded-lg">Make Admin</button>}
-                                            {user.role === 'admin' && <button onClick={() => { if (confirm('Revoke admin?')) { AuthManager.updateUserRole(user.username, 'user'); loadUsers(); } }} className="px-4 py-1.5 text-sm bg-gray-500 text-white rounded-lg">Revoke</button>}
+                                            {user.role === 'user' && <button onClick={() => handleMakeAdmin(user.username)} className="px-4 py-1.5 text-sm bg-purple-500 text-white rounded-lg hover:bg-purple-600">Make Admin</button>}
+                                            {user.role === 'admin' && <button onClick={() => handleRevokeAdmin(user.username)} className="px-4 py-1.5 text-sm bg-gray-500 text-white rounded-lg hover:bg-gray-600">Revoke Admin</button>}
                                         </div>
                                     )}
                                 </div>
@@ -429,7 +546,8 @@
             );
         }
 
-        ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
     </script>
 </body>
 </html>
