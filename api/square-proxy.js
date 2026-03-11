@@ -1,19 +1,12 @@
-// Vercel Serverless Function: /api/square-proxy.js
-
 export default async function handler(req, res) {
-  // Enable CORS
-  res.setHeader('Access-Control-Allow-Credentials', true);
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-  // Handle preflight
   if (req.method === 'OPTIONS') {
-    res.status(200).end();
-    return;
+    return res.status(200).end();
   }
 
-  // Only allow POST
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -22,19 +15,12 @@ export default async function handler(req, res) {
     const { accessToken, locationId, cursor } = req.body;
 
     if (!accessToken || !locationId) {
-      return res.status(400).json({ error: 'Missing required fields' });
+      return res.status(400).json({ error: 'Missing credentials' });
     }
 
-    // Prepare request to Square API
-    const body = {
-      enabled_location_ids: [locationId]
-    };
+    const body = { enabled_location_ids: [locationId] };
+    if (cursor) body.cursor = cursor;
 
-    if (cursor) {
-      body.cursor = cursor;
-    }
-
-    // Call Square API from server-side
     const response = await fetch('https://connect.squareup.com/v2/catalog/search-catalog-items', {
       method: 'POST',
       headers: {
@@ -46,15 +32,37 @@ export default async function handler(req, res) {
     });
 
     const data = await response.json();
-
-    if (!response.ok) {
-      return res.status(response.status).json(data);
-    }
-
-    return res.status(200).json(data);
+    return res.status(response.status).json(data);
 
   } catch (error) {
-    console.error('Square API Error:', error);
-    return res.status(500).json({ error: 'Internal server error', message: error.message });
+    return res.status(500).json({ error: error.message });
   }
 }
+```
+
+4. Click **"Commit changes"**
+
+### **Step 3: Wait for Vercel to Redeploy**
+
+1. Vercel automatically detects GitHub changes
+2. Wait 30-60 seconds
+3. Check your Vercel dashboard - should show "Building"
+
+### **Step 4: Test**
+
+Visit: `https://your-app.vercel.app/api/square-proxy`
+
+Should see: `{"error":"Method not allowed"}` ✅ (This means it's working!)
+
+If still 404, the deployment didn't work.
+
+---
+
+## 🔍 Verify Your GitHub Repo Structure:
+
+After adding the file, your repo should look like:
+```
+bookstore/
+├── index.html
+└── api/
+    └── square-proxy.js
