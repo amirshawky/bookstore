@@ -1,79 +1,176 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Square Inventory Search</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <title>Diagnostic Page</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; max-width: 800px; margin: 0 auto; }
+        .test { margin: 20px 0; padding: 15px; border: 2px solid #ccc; border-radius: 8px; }
+        .pass { background: #d4edda; border-color: #28a745; }
+        .fail { background: #f8d7da; border-color: #dc3545; }
+        button { background: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; margin: 5px; }
+        button:hover { background: #0056b3; }
+        pre { background: #f5f5f5; padding: 10px; overflow-x: auto; }
+        h2 { margin-top: 0; }
+    </style>
 </head>
-<body class="bg-gray-50">
-    <div id="root"></div>
+<body>
+    <h1>🔍 Bookstore App Diagnostics</h1>
+    <p>This page will help us find what's wrong. Run each test in order.</p>
 
-    <script type="text/babel">
-        const { useState, useEffect } = React;
+    <div id="test1" class="test">
+        <h2>Test 1: URL Check</h2>
+        <p><strong>Current URL:</strong> <span id="currentUrl"></span></p>
+        <p><strong>Expected:</strong> https://amirshawky.github.io/bookstore/</p>
+        <p><strong>Status:</strong> <span id="urlStatus"></span></p>
+    </div>
 
-        // ========================================
-        // CONFIGURATION - UPDATE THESE VALUES
-        // ========================================
-        const SQUARE_CONFIG = {
-           accessToken: 'EAAAl12N5ApoxZoy_ILv_aRqzNbJCpTuZF2CMkXIjIpiUFACtuS_mxMLPg4BqOvM',
-            locationId: 'LYE44QAJ31T28',
-            environment: 'production'
-        };
-        // ========================================
-        
-        // Validate configuration
-        function validateConfig() {
-            const errors = [];
-            if (!SQUARE_CONFIG.accessToken || SQUARE_CONFIG.accessToken === 'YOUR_SQUARE_ACCESS_TOKEN') {
-                errors.push('Square Access Token not set');
-            }
-            if (!SQUARE_CONFIG.locationId || SQUARE_CONFIG.locationId === 'YOUR_LOCATION_ID') {
-                errors.push('Square Location ID not set');
-            }
-            return errors;
+    <div id="test2" class="test">
+        <h2>Test 2: Iframe Detection</h2>
+        <p><strong>Running in iframe?</strong> <span id="iframeStatus"></span></p>
+        <p id="iframeWarning" style="color: red; display: none;"><strong>⚠️ WARNING: You are accessing through Google Sites! This will NOT work. Please copy the URL above and open it directly in a new tab.</strong></p>
+    </div>
+
+    <div id="test3" class="test">
+        <h2>Test 3: LocalStorage Test</h2>
+        <button onclick="testStorage()">Run Storage Test</button>
+        <div id="storageResult"></div>
+    </div>
+
+    <div id="test4" class="test">
+        <h2>Test 4: Square API Test</h2>
+        <p>Enter your Square credentials:</p>
+        <input type="text" id="accessToken" placeholder="Access Token" style="width: 100%; padding: 8px; margin: 5px 0;">
+        <input type="text" id="locationId" placeholder="Location ID" style="width: 100%; padding: 8px; margin: 5px 0;">
+        <button onclick="testSquare()">Test Square API</button>
+        <div id="squareResult"></div>
+    </div>
+
+    <div id="test5" class="test">
+        <h2>Test 5: User Registration Test</h2>
+        <button onclick="testRegistration()">Register Test User</button>
+        <button onclick="testLogin()">Login Test User</button>
+        <button onclick="showStoredUsers()">Show Stored Users</button>
+        <div id="userResult"></div>
+    </div>
+
+    <script>
+        // Test 1: URL Check
+        function checkUrl() {
+            const currentUrl = window.location.href;
+            const expected = 'https://amirshawky.github.io/bookstore/';
+            const isCorrect = currentUrl.includes('amirshawky.github.io/bookstore');
+            
+            document.getElementById('currentUrl').textContent = currentUrl;
+            document.getElementById('urlStatus').textContent = isCorrect ? '✅ CORRECT' : '❌ WRONG';
+            document.getElementById('test1').className = 'test ' + (isCorrect ? 'pass' : 'fail');
+            
+            return isCorrect;
         }
 
-        // Storage helper with consistent prefix
-        const STORAGE_PREFIX = 'bookstore_app_';
-        
-        const storage = {
-            get(key) {
-                try {
-                    const fullKey = STORAGE_PREFIX + key;
-                    const data = localStorage.getItem(fullKey);
-                    return data ? JSON.parse(data) : null;
-                } catch (error) {
-                    console.error('Storage get error:', error);
-                    return null;
-                }
-            },
-            set(key, value) {
-                try {
-                    const fullKey = STORAGE_PREFIX + key;
-                    localStorage.setItem(fullKey, JSON.stringify(value));
-                    return true;
-                } catch (error) {
-                    console.error('Storage set error:', error);
-                    return false;
-                }
-            },
-            delete(key) {
-                try {
-                    const fullKey = STORAGE_PREFIX + key;
-                    localStorage.removeItem(fullKey);
-                    return true;
-                } catch (error) {
-                    console.error('Storage delete error:', error);
-                    return false;
-                }
+        // Test 2: Iframe Check
+        function checkIframe() {
+            const inIframe = window.self !== window.top;
+            document.getElementById('iframeStatus').textContent = inIframe ? '❌ YES (BAD!)' : '✅ NO (GOOD!)';
+            document.getElementById('test2').className = 'test ' + (inIframe ? 'fail' : 'pass');
+            
+            if (inIframe) {
+                document.getElementById('iframeWarning').style.display = 'block';
             }
-        };
+            
+            return !inIframe;
+        }
 
-        // Simple hash function
+        // Test 3: Storage
+        function testStorage() {
+            const result = document.getElementById('storageResult');
+            result.innerHTML = '<h3>Testing...</h3>';
+            
+            try {
+                // Test write
+                localStorage.setItem('test_key', 'test_value');
+                result.innerHTML += '<p>✅ Can write to localStorage</p>';
+                
+                // Test read
+                const value = localStorage.getItem('test_key');
+                if (value === 'test_value') {
+                    result.innerHTML += '<p>✅ Can read from localStorage</p>';
+                } else {
+                    result.innerHTML += '<p>❌ Read wrong value: ' + value + '</p>';
+                }
+                
+                // Test JSON
+                const testObj = { name: 'test', role: 'admin' };
+                localStorage.setItem('test_json', JSON.stringify(testObj));
+                const readObj = JSON.parse(localStorage.getItem('test_json'));
+                if (readObj.name === 'test') {
+                    result.innerHTML += '<p>✅ Can store/read JSON</p>';
+                } else {
+                    result.innerHTML += '<p>❌ JSON parsing failed</p>';
+                }
+                
+                // Show all keys
+                result.innerHTML += '<h4>All localStorage keys:</h4><pre>';
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    result.innerHTML += key + '\n';
+                }
+                result.innerHTML += '</pre>';
+                
+                document.getElementById('test3').className = 'test pass';
+            } catch (e) {
+                result.innerHTML = '<p>❌ Error: ' + e.message + '</p>';
+                document.getElementById('test3').className = 'test fail';
+            }
+        }
+
+        // Test 4: Square API
+        async function testSquare() {
+            const result = document.getElementById('squareResult');
+            const token = document.getElementById('accessToken').value;
+            const location = document.getElementById('locationId').value;
+            
+            if (!token || !location) {
+                result.innerHTML = '<p style="color: orange;">Please enter both Access Token and Location ID</p>';
+                return;
+            }
+            
+            result.innerHTML = '<p>Testing Square API...</p>';
+            
+            try {
+                const response = await fetch('https://connect.squareup.com/v2/catalog/search-catalog-items', {
+                    method: 'POST',
+                    headers: {
+                        'Square-Version': '2024-12-18',
+                        'Authorization': 'Bearer ' + token,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        enabled_location_ids: [location],
+                        limit: 5
+                    })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    result.innerHTML = '<p>✅ Square API works!</p>';
+                    result.innerHTML += '<p>Found ' + (data.items?.length || 0) + ' items</p>';
+                    result.innerHTML += '<pre>' + JSON.stringify(data.items?.[0]?.item_data?.name || 'No items', null, 2) + '</pre>';
+                    document.getElementById('test4').className = 'test pass';
+                } else {
+                    const error = await response.text();
+                    result.innerHTML = '<p>❌ Square API error: ' + response.status + '</p>';
+                    result.innerHTML += '<pre>' + error + '</pre>';
+                    document.getElementById('test4').className = 'test fail';
+                }
+            } catch (e) {
+                result.innerHTML = '<p>❌ Fetch failed: ' + e.message + '</p>';
+                result.innerHTML += '<p>This usually means CORS blocking (iframe problem)</p>';
+                document.getElementById('test4').className = 'test fail';
+            }
+        }
+
+        // Test 5: User Registration
         async function hashPassword(password) {
             const msgBuffer = new TextEncoder().encode(password);
             const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
@@ -81,716 +178,103 @@
             return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
         }
 
-        // Auth Manager
-        const AuthManager = {
-            getUsers() {
-                return storage.get('users') || {};
-            },
+        async function testRegistration() {
+            const result = document.getElementById('userResult');
+            result.innerHTML = '<p>Registering test user...</p>';
             
-            saveUsers(users) {
-                storage.set('users', users);
-            },
-            
-            async register(username, password, email, fullName) {
-                const users = this.getUsers();
+            try {
+                const users = JSON.parse(localStorage.getItem('bookstore_users') || '{}');
+                const hashedPass = await hashPassword('test123');
                 
-                if (users[username.toLowerCase()]) {
-                    return { success: false, error: 'Username already exists' };
-                }
-                
-                const hashedPassword = await hashPassword(password);
-                const isFirstUser = Object.keys(users).length === 0;
-                
-                users[username.toLowerCase()] = {
-                    username: username.toLowerCase(),
-                    password: hashedPassword,
-                    email,
-                    fullName,
-                    role: isFirstUser ? 'admin' : 'pending',
+                users['testuser'] = {
+                    username: 'testuser',
+                    password: hashedPass,
+                    email: 'test@test.com',
+                    fullName: 'Test User',
+                    role: Object.keys(users).length === 0 ? 'admin' : 'user',
                     createdAt: new Date().toISOString()
                 };
                 
-                this.saveUsers(users);
-                return { success: true, role: users[username.toLowerCase()].role };
-            },
+                localStorage.setItem('bookstore_users', JSON.stringify(users));
+                
+                result.innerHTML = '<p>✅ Registered user: testuser</p>';
+                result.innerHTML += '<p>Password: test123</p>';
+                result.innerHTML += '<p>Role: ' + users['testuser'].role + '</p>';
+                document.getElementById('test5').className = 'test pass';
+            } catch (e) {
+                result.innerHTML = '<p>❌ Error: ' + e.message + '</p>';
+                document.getElementById('test5').className = 'test fail';
+            }
+        }
+
+        async function testLogin() {
+            const result = document.getElementById('userResult');
+            result.innerHTML = '<p>Testing login...</p>';
             
-            async login(username, password) {
-                const users = this.getUsers();
-                const user = users[username.toLowerCase()];
+            try {
+                const users = JSON.parse(localStorage.getItem('bookstore_users') || '{}');
+                const user = users['testuser'];
                 
                 if (!user) {
-                    return { success: false, error: 'Invalid username or password' };
+                    result.innerHTML = '<p>❌ User not found. Register first.</p>';
+                    return;
                 }
                 
-                const hashedPassword = await hashPassword(password);
-                if (user.password !== hashedPassword) {
-                    return { success: false, error: 'Invalid username or password' };
-                }
+                const hashedPass = await hashPassword('test123');
                 
-                if (user.role === 'pending') {
-                    return { success: false, error: 'Your account is pending admin approval' };
-                }
-                
-                return { 
-                    success: true, 
-                    user: {
+                if (user.password === hashedPass) {
+                    result.innerHTML = '<p>✅ Login successful!</p>';
+                    result.innerHTML += '<p>User persists correctly</p>';
+                    localStorage.setItem('bookstore_session', JSON.stringify({
                         username: user.username,
-                        email: user.email,
                         fullName: user.fullName,
                         role: user.role
-                    }
-                };
-            },
-            
-            async requestPasswordReset(username) {
-                const users = this.getUsers();
-                const user = users[username.toLowerCase()];
-                
-                if (!user) {
-                    return { success: false, error: 'Username not found' };
+                    }));
+                    result.innerHTML += '<p>Session saved</p>';
+                    document.getElementById('test5').className = 'test pass';
+                } else {
+                    result.innerHTML = '<p>❌ Password mismatch</p>';
+                    document.getElementById('test5').className = 'test fail';
                 }
-                
-                const resetToken = Math.random().toString(36).substring(2, 15);
-                user.resetToken = await hashPassword(resetToken);
-                user.resetTokenExpiry = new Date(Date.now() + 3600000).toISOString();
-                
-                this.saveUsers(users);
-                return { success: true, resetToken, email: user.email };
-            },
-            
-            async resetPassword(username, resetToken, newPassword) {
-                const users = this.getUsers();
-                const user = users[username.toLowerCase()];
-                
-                if (!user || !user.resetToken) {
-                    return { success: false, error: 'Invalid reset request' };
-                }
-                
-                if (new Date(user.resetTokenExpiry) < new Date()) {
-                    return { success: false, error: 'Reset token expired' };
-                }
-                
-                const hashedToken = await hashPassword(resetToken);
-                if (user.resetToken !== hashedToken) {
-                    return { success: false, error: 'Invalid reset token' };
-                }
-                
-                user.password = await hashPassword(newPassword);
-                user.resetToken = null;
-                user.resetTokenExpiry = null;
-                
-                this.saveUsers(users);
-                return { success: true };
-            },
-            
-            updateUserRole(username, role) {
-                const users = this.getUsers();
-                if (users[username.toLowerCase()]) {
-                    users[username.toLowerCase()].role = role;
-                    this.saveUsers(users);
-                    return true;
-                }
-                return false;
-            },
-            
-            deleteUser(username) {
-                const users = this.getUsers();
-                delete users[username.toLowerCase()];
-                this.saveUsers(users);
-            },
-            
-            getAllUsers() {
-                const users = this.getUsers();
-                return Object.values(users).map(u => ({
-                    username: u.username,
-                    email: u.email,
-                    fullName: u.fullName,
-                    role: u.role,
-                    createdAt: u.createdAt
-                }));
-            },
-            
-            getPendingUsers() {
-                return this.getAllUsers().filter(u => u.role === 'pending');
+            } catch (e) {
+                result.innerHTML = '<p>❌ Error: ' + e.message + '</p>';
+                document.getElementById('test5').className = 'test fail';
             }
+        }
+
+        function showStoredUsers() {
+            const result = document.getElementById('userResult');
+            
+            try {
+                const users = JSON.parse(localStorage.getItem('bookstore_users') || '{}');
+                const session = JSON.parse(localStorage.getItem('bookstore_session') || 'null');
+                
+                result.innerHTML = '<h4>Stored Users:</h4>';
+                result.innerHTML += '<pre>' + JSON.stringify(users, null, 2) + '</pre>';
+                result.innerHTML += '<h4>Current Session:</h4>';
+                result.innerHTML += '<pre>' + JSON.stringify(session, null, 2) + '</pre>';
+            } catch (e) {
+                result.innerHTML = '<p>❌ Error reading storage: ' + e.message + '</p>';
+            }
+        }
+
+        // Run initial checks
+        window.onload = function() {
+            checkUrl();
+            checkIframe();
         };
-
-        // Square API Integration
-        const SquareAPI = {
-            async searchInventory(searchTerm) {
-                try {
-                    const items = await this.getAllItems();
-                    const filtered = items.filter(item => {
-                        const name = item.name?.toLowerCase() || '';
-                        const description = item.description?.toLowerCase() || '';
-                        const sku = item.sku?.toLowerCase() || '';
-                        const author = item.author?.toLowerCase() || '';
-                        const publisher = item.publisher?.toLowerCase() || '';
-                        const search = searchTerm.toLowerCase();
-                        
-                        return name.includes(search) || description.includes(search) || 
-                               sku.includes(search) || author.includes(search) || publisher.includes(search);
-                    });
-                    return filtered;
-                } catch (error) {
-                    console.error('Search error:', error);
-                    throw error;
-                }
-            },
-            
-            async getAllItems() {
-                try {
-                    let allItems = [];
-                    let cursor = null;
-                    
-                    do {
-                        const body = { enabled_location_ids: [SQUARE_CONFIG.locationId] };
-                        if (cursor) body.cursor = cursor;
-                        
-                        const response = await fetch('https://connect.squareup.com/v2/catalog/search-catalog-items', {
-                            method: 'POST',
-                            headers: {
-                                'Square-Version': '2024-12-18',
-                                'Authorization': `Bearer ${SQUARE_CONFIG.accessToken}`,
-                                'Content-Type': 'application/json'
-                            },
-                            body: JSON.stringify(body)
-                        });
-                        
-                        if (!response.ok) {
-                            const errorText = await response.text();
-                            throw new Error(`Square API error: ${response.status}`);
-                        }
-                        
-                        const data = await response.json();
-                        allItems = allItems.concat(data.items || []);
-                        cursor = data.cursor;
-                    } while (cursor);
-                    
-                    return allItems.map(item => this.transformItem(item));
-                } catch (error) {
-                    console.error('Error fetching items:', error);
-                    throw error;
-                }
-            },
-            
-            transformItem(item) {
-                const itemData = item.item_data || {};
-                const variation = itemData.variations?.[0] || {};
-                const variationData = variation.item_variation_data || {};
-                const customAttrs = item.custom_attribute_values || {};
-                
-                return {
-                    id: item.id,
-                    name: itemData.name || '',
-                    description: itemData.description || '',
-                    sku: variationData.sku || '',
-                    price: variationData.price_money?.amount ? variationData.price_money.amount / 100 : 0,
-                    author: customAttrs.author?.string_value || '',
-                    publisher: customAttrs.publisher?.string_value || '',
-                    shelfNumber: customAttrs.shelf_number?.string_value || '',
-                    variationId: variation.id || ''
-                };
-            }
-        };
-
-        // Main App
-        function App() {
-            const [currentUser, setCurrentUser] = useState(null);
-            const [loading, setLoading] = useState(true);
-            const [view, setView] = useState('search');
-            const [configError, setConfigError] = useState(null);
-
-            useEffect(() => {
-                const configErrors = validateConfig();
-                if (configErrors.length > 0) {
-                    setConfigError(configErrors);
-                    setLoading(false);
-                    return;
-                }
-                
-                const sessionUser = storage.get('current_session');
-                if (sessionUser) {
-                    setCurrentUser(sessionUser);
-                }
-                setLoading(false);
-            }, []);
-
-            const handleLogin = (user) => {
-                setCurrentUser(user);
-                storage.set('current_session', user);
-            };
-
-            const handleLogout = () => {
-                setCurrentUser(null);
-                storage.delete('current_session');
-                setView('search');
-            };
-
-            if (loading) {
-                return (
-                    <div className="min-h-screen flex items-center justify-center">
-                        <div className="text-xl text-gray-600">Loading...</div>
-                    </div>
-                );
-            }
-
-            if (configError) {
-                return (
-                    <div className="min-h-screen flex items-center justify-center p-4">
-                        <div className="bg-red-50 border-2 border-red-300 rounded-xl p-8 max-w-2xl">
-                            <h2 className="text-2xl font-bold text-red-800 mb-4">⚠️ Configuration Required</h2>
-                            <div className="bg-white rounded-lg p-4 mb-4">
-                                <p className="font-bold text-red-700 mb-2">Missing configuration:</p>
-                                <ul className="list-disc ml-6 text-red-600 space-y-1">
-                                    {configError.map((error, i) => <li key={i}>{error}</li>)}
-                                </ul>
-                            </div>
-                            <div className="text-sm text-gray-700 space-y-2">
-                                <p className="font-bold">To fix this:</p>
-                                <ol className="list-decimal ml-6 space-y-1">
-                                    <li>Go to your GitHub repository</li>
-                                    <li>Click on index.html → Edit (pencil icon)</li>
-                                    <li>Find SQUARE_CONFIG section (around line 17)</li>
-                                    <li>Replace placeholders with your actual Square credentials</li>
-                                    <li>Commit changes</li>
-                                </ol>
-                            </div>
-                        </div>
-                    </div>
-                );
-            }
-
-            if (!currentUser) {
-                return <AuthScreen onLogin={handleLogin} />;
-            }
-
-            return (
-                <div className="min-h-screen">
-                    <Header user={currentUser} onLogout={handleLogout} view={view} setView={setView} />
-                    {view === 'search' && <SearchView />}
-                    {view === 'admin' && currentUser.role === 'admin' && <AdminView />}
-                </div>
-            );
-        }
-
-        // Auth Screen
-        function AuthScreen({ onLogin }) {
-            const [mode, setMode] = useState('login');
-            const [formData, setFormData] = useState({
-                username: '', password: '', email: '', fullName: '', 
-                confirmPassword: '', resetToken: '', newPassword: ''
-            });
-            const [error, setError] = useState('');
-            const [message, setMessage] = useState('');
-
-            const handleChange = (e) => {
-                setFormData({ ...formData, [e.target.name]: e.target.value });
-                setError('');
-            };
-
-            const handleLogin = async (e) => {
-                e.preventDefault();
-                setError('');
-                
-                if (!formData.username || !formData.password) {
-                    setError('Please enter username and password');
-                    return;
-                }
-                
-                const result = await AuthManager.login(formData.username, formData.password);
-                if (result.success) {
-                    onLogin(result.user);
-                } else {
-                    setError(result.error);
-                }
-            };
-
-            const handleRegister = async (e) => {
-                e.preventDefault();
-                setError('');
-                
-                if (!formData.username || !formData.password || !formData.email || !formData.fullName) {
-                    setError('Please fill in all fields');
-                    return;
-                }
-                
-                if (formData.password.length < 6) {
-                    setError('Password must be at least 6 characters');
-                    return;
-                }
-                
-                if (formData.password !== formData.confirmPassword) {
-                    setError('Passwords do not match');
-                    return;
-                }
-                
-                const result = await AuthManager.register(
-                    formData.username, formData.password, formData.email, formData.fullName
-                );
-                
-                if (result.success) {
-                    if (result.role === 'admin') {
-                        setMessage('Account created! You are the admin. Logging you in...');
-                        setTimeout(() => handleLogin(e), 2000);
-                    } else {
-                        setMessage('Registration successful! Pending admin approval.');
-                        setTimeout(() => {
-                            setMode('login');
-                            setFormData({ ...formData, password: '', confirmPassword: '' });
-                        }, 3000);
-                    }
-                } else {
-                    setError(result.error);
-                }
-            };
-
-            const handleRequestReset = async (e) => {
-                e.preventDefault();
-                setError('');
-                
-                if (!formData.username) {
-                    setError('Please enter your username');
-                    return;
-                }
-                
-                const result = await AuthManager.requestPasswordReset(formData.username);
-                if (result.success) {
-                    const tokenDisplay = `Reset Token: ${result.resetToken}\n\nCopy this token and use it on the next screen.\n\n(In production, this would be emailed to ${result.email})`;
-                    if (window.confirm(tokenDisplay + '\n\nClick OK to continue to reset password screen.')) {
-                        setMode('resetConfirm');
-                        setMessage('Enter the reset token and your new password below.');
-                    }
-                } else {
-                    setError(result.error);
-                }
-            };
-
-            const handleResetPassword = async (e) => {
-                e.preventDefault();
-                setError('');
-                
-                if (!formData.resetToken || !formData.newPassword) {
-                    setError('Please enter reset token and new password');
-                    return;
-                }
-                
-                if (formData.newPassword.length < 6) {
-                    setError('Password must be at least 6 characters');
-                    return;
-                }
-                
-                const result = await AuthManager.resetPassword(
-                    formData.username, formData.resetToken, formData.newPassword
-                );
-                
-                if (result.success) {
-                    setMessage('Password reset successful! Please login.');
-                    setTimeout(() => {
-                        setMode('login');
-                        setFormData({ username: formData.username, password: '', email: '', fullName: '', confirmPassword: '', resetToken: '', newPassword: '' });
-                    }, 2000);
-                } else {
-                    setError(result.error);
-                }
-            };
-
-            return (
-                <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-500 to-purple-600 p-4">
-                    <div className="bg-white p-8 rounded-2xl shadow-2xl max-w-md w-full">
-                        <div className="text-center mb-6">
-                            <div className="text-5xl mb-4">📚</div>
-                            <h1 className="text-3xl font-bold text-gray-800 mb-2">Bookstore Inventory</h1>
-                            <p className="text-gray-600">
-                                {mode === 'login' && 'Sign in to access inventory'}
-                                {mode === 'register' && 'Create your account'}
-                                {mode === 'reset' && 'Reset your password'}
-                                {mode === 'resetConfirm' && 'Enter reset details'}
-                            </p>
-                        </div>
-
-                        {error && (
-                            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-                                {error}
-                            </div>
-                        )}
-
-                        {message && (
-                            <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm">
-                                {message}
-                            </div>
-                        )}
-
-                        {mode === 'login' && (
-                            <form onSubmit={handleLogin} className="space-y-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Username</label>
-                                    <input
-                                        type="text"
-                                        name="username"
-                                        value={formData.username}
-                                        onChange={handleChange}
-                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                        placeholder="Enter username"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
-                                    <input
-                                        type="password"
-                                        name="password"
-                                        value={formData.password}
-                                        onChange={handleChange}
-                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                        placeholder="Enter password"
-                                    />
-                                </div>
-                                <button type="submit" className="w-full bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600 transition font-medium">
-                                    Sign In
-                                </button>
-                                <div className="flex justify-between text-sm">
-                                    <button type="button" onClick={() => setMode('register')} className="text-blue-500 hover:underline">
-                                        Create account
-                                    </button>
-                                    <button type="button" onClick={() => setMode('reset')} className="text-blue-500 hover:underline">
-                                        Forgot password?
-                                    </button>
-                                </div>
-                            </form>
-                        )}
-
-                        {mode === 'register' && (
-                            <form onSubmit={handleRegister} className="space-y-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
-                                    <input type="text" name="fullName" value={formData.fullName} onChange={handleChange} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="John Doe" />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                                    <input type="email" name="email" value={formData.email} onChange={handleChange} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="email@example.com" />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Username</label>
-                                    <input type="text" name="username" value={formData.username} onChange={handleChange} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="Choose username" />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
-                                    <input type="password" name="password" value={formData.password} onChange={handleChange} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="At least 6 characters" />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Confirm Password</label>
-                                    <input type="password" name="confirmPassword" value={formData.confirmPassword} onChange={handleChange} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="Re-enter password" />
-                                </div>
-                                <button type="submit" className="w-full bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600 transition font-medium">Create Account</button>
-                                <button type="button" onClick={() => setMode('login')} className="w-full text-sm text-blue-500 hover:underline">Already have an account? Sign in</button>
-                            </form>
-                        )}
-
-                        {mode === 'reset' && (
-                            <form onSubmit={handleRequestReset} className="space-y-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Username</label>
-                                    <input type="text" name="username" value={formData.username} onChange={handleChange} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="Enter your username" />
-                                </div>
-                                <button type="submit" className="w-full bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600 transition font-medium">Request Reset Token</button>
-                                <button type="button" onClick={() => setMode('login')} className="w-full text-sm text-blue-500 hover:underline">Back to login</button>
-                            </form>
-                        )}
-
-                        {mode === 'resetConfirm' && (
-                            <form onSubmit={handleResetPassword} className="space-y-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Reset Token</label>
-                                    <input type="text" name="resetToken" value={formData.resetToken} onChange={handleChange} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="Paste token here" />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">New Password</label>
-                                    <input type="password" name="newPassword" value={formData.newPassword} onChange={handleChange} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="At least 6 characters" />
-                                </div>
-                                <button type="submit" className="w-full bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600 transition font-medium">Reset Password</button>
-                                <button type="button" onClick={() => setMode('login')} className="w-full text-sm text-blue-500 hover:underline">Back to login</button>
-                            </form>
-                        )}
-                    </div>
-                </div>
-            );
-        }
-
-        // Header
-        function Header({ user, onLogout, view, setView }) {
-            return (
-                <header className="bg-white shadow-sm border-b">
-                    <div className="max-w-7xl mx-auto px-3 sm:px-4">
-                        <div className="flex justify-between items-center h-14">
-                            <div className="flex items-center space-x-2 sm:space-x-4">
-                                <h1 className="text-lg sm:text-xl font-bold text-gray-800">📚 Inventory</h1>
-                                <nav className="flex space-x-1">
-                                    <button onClick={() => setView('search')} className={`px-2 sm:px-4 py-1.5 text-sm rounded-lg transition ${view === 'search' ? 'bg-blue-500 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>Search</button>
-                                    {user.role === 'admin' && <button onClick={() => setView('admin')} className={`px-2 sm:px-4 py-1.5 text-sm rounded-lg transition ${view === 'admin' ? 'bg-blue-500 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>Admin</button>}
-                                </nav>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                                <div className="text-sm">
-                                    <div className="font-medium text-gray-700">{user.fullName}</div>
-                                    <div className="text-xs text-gray-500 capitalize">{user.role}</div>
-                                </div>
-                                <button onClick={onLogout} className="px-3 py-1.5 text-xs sm:text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition">Logout</button>
-                            </div>
-                        </div>
-                    </div>
-                </header>
-            );
-        }
-
-        // Search View
-        function SearchView() {
-            const [searchTerm, setSearchTerm] = useState('');
-            const [results, setResults] = useState([]);
-            const [loading, setLoading] = useState(false);
-            const [searched, setSearched] = useState(false);
-
-            const handleSearch = async (e) => {
-                e.preventDefault();
-                if (!searchTerm.trim()) return;
-                setLoading(true);
-                setSearched(true);
-                try {
-                    const items = await SquareAPI.searchInventory(searchTerm);
-                    setResults(items);
-                } catch (error) {
-                    console.error(error);
-                    alert('Failed to search: ' + error.message);
-                } finally {
-                    setLoading(false);
-                }
-            };
-
-            return (
-                <div className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
-                    <div className="mb-4 sm:mb-6">
-                        <form onSubmit={handleSearch} className="flex gap-2">
-                            <input type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Search by name, author, publisher, SKU..." className="flex-1 px-3 sm:px-4 py-2 sm:py-3 text-sm sm:text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
-                            <button type="submit" disabled={loading} className="px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 transition">{loading ? '...' : 'Search'}</button>
-                        </form>
-                    </div>
-                    {loading && <div className="text-center py-8 sm:py-12"><div className="text-lg sm:text-xl text-gray-600">Searching...</div></div>}
-                    {!loading && searched && results.length === 0 && <div className="text-center py-8 sm:py-12"><div className="text-lg sm:text-xl text-gray-600">No results found</div></div>}
-                    {!loading && results.length > 0 && (
-                        <div>
-                            <div className="mb-3 text-xs sm:text-sm text-gray-600">Found {results.length} item{results.length !== 1 ? 's' : ''}</div>
-                            <div className="grid gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-3">{results.map(item => <ItemCard key={item.id} item={item} />)}</div>
-                        </div>
-                    )}
-                </div>
-            );
-        }
-
-        // Item Card
-        function ItemCard({ item }) {
-            const [expanded, setExpanded] = useState(false);
-            const getCleanDescription = (desc) => {
-                if (!desc) return '';
-                const lines = desc.split('\n');
-                if (lines.length > 3) {
-                    const lastThree = lines.slice(-3);
-                    const hasAttrs = lastThree.some(line => line.startsWith('Author:') || line.startsWith('Publisher:') || line.startsWith('Shelf No:'));
-                    if (hasAttrs) return lines.slice(0, -3).join('\n');
-                }
-                return desc;
-            };
-            const cleanDescription = getCleanDescription(item.description);
-
-            return (
-                <div className="bg-white rounded-lg shadow-md p-4 hover:shadow-lg transition-shadow">
-                    <h3 className="text-base sm:text-lg font-bold text-gray-800 mb-2">{item.name}</h3>
-                    {cleanDescription && <p className="text-gray-600 text-xs sm:text-sm mb-2 whitespace-pre-line">{expanded ? cleanDescription : cleanDescription.slice(0, 80) + (cleanDescription.length > 80 ? '...' : '')}</p>}
-                    {cleanDescription.length > 80 && <button onClick={() => setExpanded(!expanded)} className="text-blue-500 text-xs mb-2 hover:underline">{expanded ? 'Show less' : 'Show more'}</button>}
-                    <div className="space-y-1 text-xs sm:text-sm">
-                        {item.sku && <div className="flex"><span className="text-gray-500 w-16">SKU:</span><span className="text-gray-700 font-medium">{item.sku}</span></div>}
-                        {item.price > 0 && <div className="flex"><span className="text-gray-500 w-16">Price:</span><span className="text-gray-700 font-medium">${item.price.toFixed(2)}</span></div>}
-                        {item.author && <div className="flex"><span className="text-gray-500 w-16">Author:</span><span className="text-gray-700">{item.author}</span></div>}
-                        {item.publisher && <div className="flex"><span className="text-gray-500 w-16">Publisher:</span><span className="text-gray-700 text-xs">{item.publisher}</span></div>}
-                        {item.shelfNumber && <div className="flex"><span className="text-gray-500 w-16">Shelf:</span><span className="text-gray-700">{item.shelfNumber}</span></div>}
-                    </div>
-                </div>
-            );
-        }
-
-        // Admin View
-        function AdminView() {
-            const [pendingUsers, setPendingUsers] = useState([]);
-            const [allUsers, setAllUsers] = useState([]);
-            const [loading, setLoading] = useState(true);
-
-            useEffect(() => { loadUsers(); }, []);
-
-            const loadUsers = () => {
-                setLoading(true);
-                setPendingUsers(AuthManager.getPendingUsers());
-                setAllUsers(AuthManager.getAllUsers());
-                setLoading(false);
-            };
-
-            const handleApprove = (username) => { AuthManager.updateUserRole(username, 'user'); loadUsers(); };
-            const handleReject = (username) => { if (confirm(`Delete user ${username}?`)) { AuthManager.deleteUser(username); loadUsers(); } };
-            const handleMakeAdmin = (username) => { if (confirm(`Make ${username} an admin?`)) { AuthManager.updateUserRole(username, 'admin'); loadUsers(); } };
-            const handleRevokeAdmin = (username) => { if (confirm(`Revoke admin from ${username}?`)) { AuthManager.updateUserRole(username, 'user'); loadUsers(); } };
-
-            if (loading) return <div className="text-center py-8">Loading...</div>;
-
-            return (
-                <div className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
-                    <h2 className="text-xl sm:text-2xl font-bold text-gray-800 mb-4 sm:mb-6">User Management</h2>
-                    {pendingUsers.length > 0 && (
-                        <div className="mb-6 sm:mb-8">
-                            <h3 className="text-lg sm:text-xl font-semibold text-gray-700 mb-3 sm:mb-4">Pending Approvals ({pendingUsers.length})</h3>
-                            <div className="bg-white rounded-lg shadow overflow-hidden">
-                                {pendingUsers.map(user => (
-                                    <div key={user.username} className="border-b last:border-b-0 p-3 sm:p-4">
-                                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                                            <div>
-                                                <div className="font-medium text-gray-800">{user.fullName}</div>
-                                                <div className="text-sm text-gray-500">@{user.username} • {user.email}</div>
-                                            </div>
-                                            <div className="flex space-x-2">
-                                                <button onClick={() => handleApprove(user.username)} className="px-3 sm:px-4 py-1.5 sm:py-2 text-sm bg-green-500 text-white rounded-lg hover:bg-green-600">Approve</button>
-                                                <button onClick={() => handleReject(user.username)} className="px-3 sm:px-4 py-1.5 sm:py-2 text-sm bg-red-500 text-white rounded-lg hover:bg-red-600">Reject</button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-                    <div>
-                        <h3 className="text-lg sm:text-xl font-semibold text-gray-700 mb-3 sm:mb-4">All Users ({allUsers.length})</h3>
-                        <div className="bg-white rounded-lg shadow overflow-hidden">
-                            {allUsers.map(user => (
-                                <div key={user.username} className="border-b last:border-b-0 p-3 sm:p-4">
-                                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                                        <div>
-                                            <div className="font-medium text-gray-800">{user.fullName}</div>
-                                            <div className="text-sm text-gray-500">@{user.username} • {user.email}</div>
-                                            <span className={`inline-block px-2 py-0.5 text-xs rounded mt-1 ${user.role === 'admin' ? 'bg-purple-100 text-purple-800' : user.role === 'user' ? 'bg-blue-100 text-blue-800' : 'bg-yellow-100 text-yellow-800'}`}>{user.role}</span>
-                                        </div>
-                                        {user.role !== 'pending' && (
-                                            <div>
-                                                {user.role === 'user' && <button onClick={() => handleMakeAdmin(user.username)} className="px-3 sm:px-4 py-1.5 text-sm bg-purple-500 text-white rounded-lg hover:bg-purple-600">Make Admin</button>}
-                                                {user.role === 'admin' && <button onClick={() => handleRevokeAdmin(user.username)} className="px-3 sm:px-4 py-1.5 text-sm bg-gray-500 text-white rounded-lg hover:bg-gray-600">Revoke Admin</button>}
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-            );
-        }
-
-        // Render
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
     </script>
+
+    <hr style="margin: 40px 0;">
+    <h2>📋 Instructions:</h2>
+    <ol>
+        <li><strong>Check Test 1 & 2:</strong> If either fails, you MUST open this page directly, not through Google Sites</li>
+        <li><strong>Run Test 3:</strong> Click "Run Storage Test" - this must pass or nothing will work</li>
+        <li><strong>Run Test 4:</strong> Enter your Square credentials and test the API</li>
+        <li><strong>Run Test 5:</strong> Test user registration and login persistence</li>
+    </ol>
+    
+    <p><strong>If Test 1 or 2 fails:</strong> Copy this URL and paste it in a NEW browser tab:</p>
+    <p style="background: #ffffcc; padding: 10px; font-family: monospace;">https://amirshawky.github.io/bookstore/diagnostic.html</p>
 </body>
 </html>
